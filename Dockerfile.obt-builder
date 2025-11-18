@@ -1,0 +1,14 @@
+FROM python:3.10-slim
+
+# setear workdir
+WORKDIR /app
+
+# dependencias del sistema (si necesitas gcc para librerías)
+RUN apt-get update
+
+# copia requirements (si no existe, puedes instalar paquetes directamente)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# copia código
+COPY . /app
