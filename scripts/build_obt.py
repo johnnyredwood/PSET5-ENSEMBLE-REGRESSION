@@ -21,9 +21,9 @@ class OBTBuilder:
     
     def create_obt_table(self):
         with self.conn.cursor() as cursor:
-            #cursor.execute("CREATE SCHEMA IF NOT EXISTS analytics;")
+            cursor.execute("CREATE SCHEMA IF NOT EXISTS analytics;")
             
-            #cursor.execute("DROP TABLE IF EXISTS analytics.obt_trips;")
+            cursor.execute("DROP TABLE IF EXISTS analytics.obt_trips;")
             
             cursor.execute("""
                 CREATE TABLE analytics.obt_trips (
@@ -48,7 +48,7 @@ class OBTBuilder:
                     rate_code_desc VARCHAR(50),
                     payment_type INTEGER,
                     payment_type_desc VARCHAR(50),
-                    trip_type INTEGER,
+                    trip_type VARCHAR(10),
                     
                     passenger_count INTEGER,
                     trip_distance DECIMAL(10,2),
@@ -140,27 +140,31 @@ class OBTBuilder:
                         WHEN 6 THEN 'Voided trip'
                         ELSE 'Unknown'
                     END as payment_type_desc,
-                    {'trip_type' if service == 'green' else 'NULL'} as trip_type,
-                    
                     passenger_count,
-                    trip_distance,
-                    fare_amount,
-                    extra,
-                    mta_tax,
-                    tip_amount,
-                    tolls_amount,
-                    improvement_surcharge,
-                    congestion_surcharge,
-                    airport_fee,
-                    total_amount,
+                    CASE WHEN trip_distance > 0 AND trip_distance < 100000 THEN trip_distance ELSE 0 END as trip_distance,
+                    CASE WHEN fare_amount > 0 AND fare_amount < 100000 THEN fare_amount ELSE 0 END as fare_amount,
+                    CASE WHEN extra > 0 AND extra < 100000 THEN extra ELSE 0 END as extra,
+                    CASE WHEN mta_tax > 0 AND mta_tax < 100000 THEN mta_tax ELSE 0 END as mta_tax,
+                    CASE WHEN tip_amount > 0 AND tip_amount < 100000 THEN tip_amount ELSE 0 END as tip_amount,
+                    CASE WHEN tolls_amount > 0 AND tolls_amount < 100000 THEN tolls_amount ELSE 0 END as tolls_amount,
+                    CASE WHEN improvement_surcharge > 0 AND improvement_surcharge < 100000 THEN improvement_surcharge ELSE 0 END as improvement_surcharge,
+                    CASE WHEN congestion_surcharge > 0 AND congestion_surcharge < 100000 THEN congestion_surcharge ELSE 0 END as congestion_surcharge,
+                    CASE WHEN airport_fee > 0 AND airport_fee < 100000 THEN airport_fee ELSE 0 END as airport_fee,
+                    CASE WHEN total_amount > 0 AND total_amount < 100000 THEN total_amount ELSE 0 END as total_amount,
                     store_and_fwd_flag,
-
-                    EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) / 60 as trip_duration_min,
-                    CASE WHEN EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) > 0 
-                         THEN (trip_distance / (EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) / 3600))
-                         ELSE 0 
+                    CASE 
+                        WHEN EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) > 0
+                            AND (EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) / 60) < 10000
+                        THEN EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) / 60
+                        ELSE 0
+                    END AS trip_duration_min,
+                    CASE 
+                        WHEN EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) > 0
+                             AND trip_distance / (EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) / 3600) < 150
+                        THEN (trip_distance / (EXTRACT(EPOCH FROM ({dropoff_col} - {pickup_col})) / 3600))
+                        ELSE 0 
                     END as avg_speed_mph,
-                    CASE WHEN fare_amount > 0 THEN (tip_amount / fare_amount * 100) ELSE 0 END as tip_pct,
+                    CASE WHEN fare_amount > 0 AND (tip_amount / fare_amount * 100) < 10000 THEN (tip_amount / fare_amount * 100) ELSE 0 END as tip_pct,
                     
                     '{run_id}' as run_id,
                     source_year,
@@ -200,7 +204,6 @@ class OBTBuilder:
                     rate_code_desc = source.rate_code_desc,
                     payment_type = source.payment_type,
                     payment_type_desc = source.payment_type_desc,
-                    trip_type = source.trip_type,
                     passenger_count = source.passenger_count,
                     trip_distance = source.trip_distance,
                     fare_amount = source.fare_amount,
@@ -226,7 +229,7 @@ class OBTBuilder:
                         pickup_datetime, dropoff_datetime, pickup_hour, pickup_dow, month, year,
                         pu_location_id, pu_zone, pu_borough, do_location_id, do_zone, do_borough,
                         service_type, vendor_id, vendor_name, rate_code_id, rate_code_desc,
-                        payment_type, payment_type_desc, trip_type,
+                        payment_type, payment_type_desc,
                         passenger_count, trip_distance, fare_amount, extra, mta_tax, tip_amount,
                         tolls_amount, improvement_surcharge, congestion_surcharge, airport_fee,
                         total_amount, store_and_fwd_flag,
@@ -237,7 +240,7 @@ class OBTBuilder:
                         source.pickup_datetime, source.dropoff_datetime, source.pickup_hour, source.pickup_dow, source.month, source.year,
                         source.pu_location_id, source.pu_zone, source.pu_borough, source.do_location_id, source.do_zone, source.do_borough,
                         source.service_type, source.vendor_id, source.vendor_name, source.rate_code_id, source.rate_code_desc,
-                        source.payment_type, source.payment_type_desc, source.trip_type,
+                        source.payment_type, source.payment_type_desc,
                         source.passenger_count, source.trip_distance, source.fare_amount, source.extra, source.mta_tax, source.tip_amount,
                         source.tolls_amount, source.improvement_surcharge, source.congestion_surcharge, source.airport_fee,
                         source.total_amount, source.store_and_fwd_flag,
@@ -268,7 +271,7 @@ class OBTBuilder:
     def run(self, year_start, year_end, services, run_id, months=None):
         try:
             self.connect()
-            #self.create_obt_table()
+            self.create_obt_table()
             self.build_obt(year_start, year_end, services, run_id, months)
         except Exception as e:
             print(f"Error: {e}")
