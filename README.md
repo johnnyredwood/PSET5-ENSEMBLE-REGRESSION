@@ -1,7 +1,12 @@
 ```Universidad San Francisco de Quito
 Data Mining
 Proyecto 05
-John Ochoa Abad 345743
+Andrés Bohórquez (00320727)
+Paulo Cantos (00326682)
+John Ochoa (00345743)
+Daniela Salazar (00329368)
+Gian Tituaña (00325991)
+
 
 #Github Link:
 https://github.com/johnnyredwood/PSET5-ENSEMBLE-REGRESSION
