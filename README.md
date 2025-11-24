@@ -1,29 +1,25 @@
 ```Universidad San Francisco de Quito
 Data Mining
-Proyecto 04
+Proyecto 05
 John Ochoa Abad 345743
 
 #Github Link:
-https://github.com/johnnyredwood/PSET4_NYTAXIS_ML_SCRATCH_SCIKIT
+https://github.com/johnnyredwood/PSET5-ENSEMBLE-REGRESSION
 
 #Descripción del proyecto:
-Implementé una infraestructura analítica completa utilizando Docker Compose que integra Jupyter+Spark con Postgres para procesar el dataset 
-NYC TLC Trips 2015-2025. El proyecto replica el proceso de ingesta de datos Parquet de taxis Yellow y Green hacia un esquema raw en Snowflake, 
-construyendo posteriormente una tabla analítica unificada (One Big Table) en el esquema analytics con un único comando a través del uso de un script
-de Python
+Infraestructura analítica completa con Docker Compose integrando Jupyter+Spark y Postgres para procesar el dataset NYC TLC Trips 2015–2025. Se ingesta cobertura Yellow y Green en esquema RAW y se construye una tabla analítica unificada (One Big Table) en el esquema `analytics` mediante un único comando (`build_obt.py`).
 
-Con los datos en analytics genere la limpieza y preparación de los mismos para posterior aplicación de algoritmos de ML orientados a predecir el total_amount
-de pago para el pickup acorde a variables dadas por los datos. Estas predicciones se basan en modelos from Scratch y de Scikit Learn de Stochastic Gradient Descent,
-Lasso, Ridge y ElasticNet afinados para los mejores parámetros a través de Grid Search. Una vez generados los modelos se genero una comparación de los mismos 
-a manera de seleccionar el mejor modelo para la predicción adecuada del precio.
+Sobre la OBT se realiza muestreo controlado y preparación de features (scaling numéricas + one-hot categóricas) para entrenar y comparar modelos de regresión enfocándose en predecir `total_amount` al pickup. En esta versión (PSET5) se evoluciona desde modelos lineales regularizados hacia un set de modelos ensemble (Voting, Bagging, Pasting, Gradient Boosting y LightGBM) más un baseline lineal, seleccionando el mejor por RMSE temporal en validación y auditando desempeño en test.
 
 #Checklist de aceptación
 [x] Docker Compose levanta Spark y Jupyter Notebook.
-[x] Todas las credenciales/parámetros provienen de variables de ambiente (.env).
-[x] Cobertura 2015–2025 (Yellow/Green) cargada en raw con matriz y conteos por lote.
-[x] analytics.obt_trips creada con columnas mínimas, derivadas y metadatos.
-[x] Modelos ML Scratch vs ScikitLearn
-[x] README claro: pasos, variables, esquema, decisiones, troubleshooting.
+[x] Variables sensibles gestionadas vía archivo .env.
+[x] Cobertura 2015–2025 (Yellow/Green) cargada en RAW con monitoreo por lote.
+[x] Tabla `analytics.obt_trips` construida con columnas base, derivadas y metadatos.
+[x] Muestreo controlado y particionado temporal (Train ≤2022 / Val 2023 / Test 2024).
+[x] Modelos Ensemble (Voting, Bagging, Pasting, Gradient Boosting, LightGBM) comparados con baseline.
+[x] Selección por menor RMSE en validación manteniendo MAE y R² estables.
+[x] README claro: pasos, variables, arquitectura, decisiones y troubleshooting.
 
 #Variables de ambiente: listado y propósito; guía para .env.
 
@@ -52,24 +48,24 @@ PG_DB=database123
 Con estas variables siguiendo el ejemplo del .env.example incluido en el proyecto se puede reproducir el mismo con credenciales propias
 de esta manera se gestiona correctamente los datos sensibles.
 
-#Arquitectura (diagrama/tabla): Spark/Jupyter → Snowflake (raw → analytics.obt_trips).
+#Arquitectura (flujo resumido)
 
- Loaders Raw - Taxi Trips y Zones
+ Ingesta Parquet (Yellow/Green & Zones)
         │
         ▼
- Construcción OBT- Analytics
+ Esquema RAW (tablas particionadas + metadatos)
         │
         ▼
- Preparación de Datos
+ Construcción OBT (`analytics.obt_trips`)
         │
         ▼
- Modelos ML Scratch
+ Muestreo & Preparación (limpieza, encoding, scaling)
         │
         ▼
- Modelos ML Scikit Learn
+ Entrenamiento Modelos (Baseline + Ensembles)
         │
         ▼
- Comparación Modelos
+ Selección & Evaluación (Validación / Test)
 
 
 #Pasos para Docker Compose y ejecución de notebooks (incluido comando para construir OBT).
@@ -82,7 +78,7 @@ Prerrequisitos
 1. Descargar de repositorio y Configuración del Ambiente
 
 - Descargar el repositorio a su entorno local con
-git clone https://github.com/johnnyredwood/PSET4_NYTAXIS_ML_SCRATCH_SCIKIT
+git clone https://github.com/johnnyredwood/PSET5-ENSEMBLE-REGRESSION/
 
 Crear archivo de variables de ambiente:
 
@@ -92,38 +88,35 @@ cp .env.example .env
 - Editar el archivo .env con tus credenciales
 nano .env
 
-2. Verificar estructura de directorios:
+2. Verificar estructura de directorios (vista clave):
 
-📁 drivers
-📁 Evidencias
-📁 init-scripts
+📁 drivers                  -> Dependencias externas (drivers JDBC, etc.)
+📁 Evidencias               -> Capturas / artefactos de validación y resultados
+📁 init-scripts             -> SQL inicial (esquemas, permisos) para Postgres
 │   └── 01-init-schemas.sql
-📁 libros
-│   📁 .ipynb_checkpoints
-│   │   ├── 01_ingesta_parquet_raw-checkpoint.ipynb
-│   │   ├── checkpointTaxisYellow-checkpoint.json
-│   │   └── ml_total_amount_regression-checkpoint.ipynb
-│   ├── 01_ingesta_parquet_raw.ipynb
-│   ├── checkpointTaxisGreen.json
-│   ├── checkpointTaxisYellow.json
-│   ├── ml_total_amount_regression.ipynb
-│   └── postgresql-42.2.5.jar
-📁 logs
-📁 scripts
-│   └── build_obt.py
-📁 warehouse_data
-📁 warehouse_ui_data
+📁 libros                   -> Notebooks de ingesta y modelado
+│   📁 .ipynb_checkpoints    -> Estados intermedios automáticos
+│   ├── 01_ingesta_parquet_raw.ipynb  -> Ingesta masiva RAW
+│   ├── pset5_ensemble_regression.ipynb -> Entrenamiento y comparación ensembles
+│   ├── checkpointTaxisGreen.json      -> Progreso ingesta Green
+│   ├── checkpointTaxisYellow.json     -> Progreso ingesta Yellow
+│   └── postgresql-42.2.5.jar          -> Driver JDBC Postgres
+📁 logs                     -> Logs operativos / seguimiento procesos
+📁 scripts                  -> Scripts utilitarios (ETL / construcción OBT)
+│   └── build_obt.py        -> Construcción tabla OBT parametrizada
+📁 warehouse_data           -> Data directory Postgres (persistencia física)
+📁 warehouse_ui_data        -> Data de la UI (pgAdmin / sesiones)
 │   ├── azurecredentialcache
 │   ├── sessions
 │   ├── storage
 │   └── pgadmin4.db
-.env
-.env.example
-.gitignore
-docker-compose.yaml
-Dockerfile.obt-builder
-README.md
-requirements.txt
+.env                        -> Variables de entorno locales (no versionar sensibles)
+.env.example                -> Plantilla de referencia para reproducir entorno
+.gitignore                  -> Exclusiones de control de versión
+docker-compose.yaml         -> Orquestación de servicios (Spark, Jupyter, Postgres, pgAdmin)
+Dockerfile.obt-builder      -> Imagen especializada para construcción OBT
+README.md                   -> Documentación del proyecto
+requirements.txt            -> Dependencias Python base
 
 3. Inicialización de la Infraestructura
 Levantar los servicios con Docker Compose:
@@ -258,49 +251,4 @@ con el Docker Desktop verificando que el contenedor este arriba e ingresando a l
 sin problema a Jupyter
 
 *Comentarios respecto a modelos ML:
-
-Enfoque general
-
-Se implementaron cuatro modelos lineales regularizados desde cero (SGD, Ridge, Lasso, Elastic Net) utilizando NumPy puro, para demostrar comprensión de los algoritmos de optimización y regularización.
-
-Cada modelo tiene su versión equivalente en scikit learn con idéntico preprocesamiento, lo que permite una comparación justa y reproducible de rendimiento y tiempo.
-
-2. Preprocesamiento y features
-
-Se incluyeron únicamente variables disponibles en pickup para evitar data leakage.
-
-El pipeline común incluyó:
-
-Imputación de valores ausentes.
-
-Escalado (StandardScaler) obligatorio para los modelos con penalización L1/L2.
-
-Codificación One-Hot de variables categóricas controlando cardinalidad (Top-K + “Other”).
-
-PolynomialFeatures en variables numéricas clave (trip_distance, pickup_hour, passenger_count) para capturar interacciones no lineales.
-
-Se mantuvieron seeds fijas y un split temporal (Train: años antiguos, Valid: intermedios, Test: recientes) para garantizar comparabilidad y reproducibilidad.
-
-3. Modelos from-scratch
-
-SGD implementado con descenso de gradiente estocástico y tasa de aprendizaje adaptable.
-
-Ridge, Lasso y Elastic Net resolvieron sus penalizaciones mediante optimización iterativa tipo coordinate descent o gradiente regularizado.
-
-Cada modelo se encapsuló con métodos .fit() y .predict() y métricas internas de convergencia.
-
-4. Comparación con scikit-learn
-
-Los pipelines equivalentes (SGDRegressor, Ridge, Lasso, ElasticNet) de scikit-learn se configuraron con los mismos hiperparámetros (alpha, l1_ratio, eta0, max_iter), escalador, polinomios
-
-Se realizó búsqueda en malla (GridSearch) comparable entre ambas versiones, registrando métricas (RMSE, MAE, R cuadrado) y tiempos.
-
-Las implementaciones propias mostraron resultados coherentes con sklearn, validando la correcta implementación matemática de los modelos.
-
-5. Evaluación y métricas
-
-Métricas utilizadas: RMSE y MAE como principales; R cuadrado como secundaria.
-
-Se reportó una tabla comparativa completa con los ocho pipelines (4 propios + 4 sklearn) y análisis de estabilidad frente a alpha y l1_ratio.
-
-El modelo ganador se seleccionó con base en menor RMSE en validación
+\n+Enfoque actualizado (PSET5 - Modelos Ensemble)\n+\n+Se migró del enfoque de modelos lineales regularizados (SGD, Ridge, Lasso, ElasticNet desde cero y sklearn) hacia un conjunto de modelos ensemble y comparativos para mejorar capacidad predictiva sobre `total_amount` y robustez temporal.\n+\n+Modelos incluidos:\n+* Baseline: Regresión Lineal con preprocesamiento.\n+* VotingRegressor: combinación de `DecisionTreeRegressor`, `Ridge`, `Lasso` (voto promedio).\n+* Bagging (bootstrap) sobre árboles de decisión.\n+* Pasting (sin bootstrap) como contraste de muestreo.\n+* Gradient Boosting con búsqueda de hiperparámetros vía `GridSearchCV` + `TimeSeriesSplit`.\n+* LightGBM (`LGBMRegressor`) con grid search y control de profundidad/hojas.\n+\n+Preprocesamiento y Features:\n+* Variables únicamente disponibles al momento del pickup para evitar leakage: `passenger_count`, `trip_distance`, `pickup_hour`, `pickup_dow`, `month`, `year`, `pu_location_id`, `service_type`, `vendor_id`, `rate_code_id`, `payment_type`.\n+* Limpieza: filtrado de outliers y reglas lógicas (rango de `total_amount`, `trip_distance`, duración, pasajeros).\n+* Capado de cardinalidad de `pu_location_id` (IDs > 265 agrupados).\n+* Split temporal fijo: Train (<=2022), Validación (2023), Test (2024).\n+* Transformaciones: `StandardScaler` para numéricas y `OneHotEncoder(handle_unknown='ignore', max_categories=50)` para categóricas dentro de un `ColumnTransformer`.\n+* Se eliminaron polígonos/polimorfismo y generación polinomial para priorizar interpretabilidad y velocidad en ensembles.\n+\n+Muestreo y Estrategia de Carga:\n+* Extracción vía Spark JDBC desde `analytics.obt_trips` con query parametrizada y `random() <= 0.02` para generar una muestra balanceada multianual.\n+* Particionamiento por año para lectura paralela y deduplicación antes de pasar a Pandas.\n+\n+Entrenamiento y Búsqueda de Hiperparámetros:\n+* `TimeSeriesSplit(n_splits=5)` para respetar el orden temporal en Gradient Boosting y LightGBM.\n+* Grids concisos enfocándose en profundidad, tasa de aprendizaje, número de estimadores y subsampling (`subsample`, `colsample_bytree`).\n+* Registro de tiempos de ajuste (segundos) para comparar costo computacional vs. mejora predictiva.\n+\n+Evaluación:\n+* Métricas: RMSE y MAE principales; R² como referencia de varianza explicada.\n+* Selección del modelo final por menor RMSE en validación (2023).\n+* Evaluación final en Test (2024) sólo con el mejor pipeline para evitar sobre-reporting.\n+\n+Hallazgos Clave:\n+* LightGBM y Gradient Boosting ofrecen mejor trade-off entre error y estabilidad temporal.\n+* Bagging vs Pasting evidencian el impacto positivo del bootstrap bajo alta variabilidad de ubicaciones.\n+* VotingRegressor estabiliza pero no siempre supera a boosting cuando las relaciones no lineales dominan.\n+\n+Próximos pasos potenciales (no implementados aún):\n+* Stacking de nivel 2 (meta-modelo).\n+* Ajuste de tasa de muestreo dinámica por año para balances finos.\n+* Incorporar características derivadas de distancia temporal (festivos, clima).\n+\n+Checklist actualizado añade:\n+[x] Modelos Ensemble (Voting, Bagging, Gradient Boosting, LightGBM) comparados con baseline.\n+\n+Dependencias adicionales requeridas para esta fase (agregar en `requirements.txt` si se desea reproducibilidad directa): `scikit-learn`, `lightgbm`, `seaborn`, `matplotlib`, `python-dotenv`, `snowflake-connector-python`, `pyspark`.\n+\n+El modelo ganador se determina con base en el menor RMSE de validación manteniendo consistencia del MAE y sin degradar significativamente R².\n+```
